@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rotina Semanal Colaborativa (Local)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        :root {
+            --primary-color: #4f46e5;
+            --secondary-color: #f97316;
+            --success-color: #10b981;
+            --fail-color: #ef4444;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+        .tab-button {
+            padding: 0.75rem 1.5rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            border-bottom: 3px solid transparent;
+            font-weight: 600;
+        }
+        .tab-button.active {
+            color: var(--primary-color);
+            border-bottom-color: var(--primary-color);
+            background-color: #eef2ff;
+        }
+        .task-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem;
+            margin-bottom: 0.5rem;
+            border-radius: 0.5rem;
+            background-color: white;
+            transition: all 0.3s ease;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        .task-completed {
+            background-color: #ecfdf5;
+            text-decoration: line-through;
+            color: #6b7280;
+        }
+        .award-card {
+            background: linear-gradient(135deg, #fef3c7, #fde68a);
+            border: 2px solid #fbbf24;
+            box-shadow: 0 10px 15px rgba(251, 191, 36, 0.4);
+        }
+        .icon-check {
+            width: 1.25rem;
+            height: 1.25rem;
+            border-radius: 50%;
+            border: 2px solid #9ca3af;
+            cursor: pointer;
+            transition: background-color 0.3s, border-color 0.3s;
+        }
+        .task-completed .icon-check {
+            background-color: var(--success-color);
+            border-color: var(--success-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .delete-btn {
+            background-color: var(--fail-color);
+            color: white;
+            padding: 0.5rem 0.75rem;
+            border-radius: 0.375rem;
+            transition: background-color 0.2s;
+        }
+        .delete-btn:hover {
+            background-color: #b91c1c;
+        }
+    </style>
+</head>
+<body class="min-h-screen">
+    <div id="app" class="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8">
+        <header class="text-center mb-8">
+            <h1 class="text-3xl font-extrabold text-gray-900 sm:text-4xl">
+                ✨ Rotina Semanal Colaborativa
+            </h1>
+            <p class="mt-2 text-lg text-gray-500">
+                Organização, motivação e recompensas para o casal!
+            </p>
+            <!-- LOCAL STORAGE WARNING -->
+            <div class="mt-4 bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-md" role="alert">
+                <p class="font-bold">MODO DE ARMAZENAMENTO LOCAL (PROTÓTIPO)</p>
+                <p class="text-sm">Os dados estão sendo salvos apenas no seu navegador. Serão perdidos se o cache for limpo ou se você mudar de dispositivo. (Substituiremos por Node.js em breve!)</p>
+            </div>
+        </header>
+
+        <!-- Loading / Setup Screen -->
+        <div id="loading-screen" class="text-center py-20 text-gray-500">
+            <svg class="animate-spin h-8 w-8 text-indigo-500 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p class="mt-4">Carregando dados locais...</p>
+        </div>
+
+        <!-- Main Content (Hidden initially) -->
+        <div id="main-content" class="bg-white rounded-xl shadow-xl hidden">
+            <!-- Tab Navigation -->
+            <div class="flex border-b border-gray-200">
+                <button id="tab-user" class="tab-button active flex-1" onclick="switchTab('user')">
+                    Minha Rotina
+                </button>
+                <button id="tab-partner" class="tab-button flex-1" onclick="switchTab('partner')">
+                    Rotina da Esposa
+                </button>
+                <button id="tab-stats" class="tab-button flex-1" onclick="switchTab('stats')">
+                    Rendimento Semanal
+                </button>
+            </div>
+
+            <!-- Tab Content Containers -->
+            <div id="tab-content" class="p-6">
+                <!-- 1. Minha Rotina (User's Tab) -->
+                <div id="content-user" class="tab-pane">
+                    <h2 class="text-2xl font-bold mb-4 text-gray-800" id="user-title">Minhas Tarefas (Seu ID Local: <span id="current-user-id"></span>)</h2>
+
+                    <!-- Task Input Form -->
+                    <div class="flex space-x-2 mb-6">
+                        <input type="text" id="user-task-input" placeholder="Adicionar nova tarefa..." class="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
+                        <button onclick="addTask('user')" class="bg-indigo-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-indigo-700 transition duration-150">
+                            Adicionar
+                        </button>
+                    </div>
+
+                    <!-- Task List -->
+                    <div id="user-task-list" class="space-y-3">
+                        <p class="text-center text-gray-500">Nenhuma tarefa para esta semana. Adicione uma!</p>
+                    </div>
+                </div>
+
+                <!-- 2. Rotina da Esposa (Partner's Tab) -->
+                <div id="content-partner" class="tab-pane hidden">
+                    <h2 class="text-2xl font-bold mb-4 text-gray-800">Tarefas da Esposa</h2>
+
+                    <!-- Daily Motivational Message -->
+                    <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6 rounded-md">
+                        <div class="flex items-center">
+                            <svg class="h-6 w-6 text-yellow-500 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                            </svg>
+                            <p class="font-semibold text-yellow-800">Mensagem do Dia:</p>
+                        </div>
+                        <p id="motivational-message" class="mt-2 text-sm text-yellow-700 italic">
+                            Carregando mensagem...
+                        </p>
+                    </div>
+
+                    <!-- Task Input Form (for partner) -->
+                    <div class="flex space-x-2 mb-6">
+                        <input type="text" id="partner-task-input" placeholder="Adicionar tarefa para a esposa..." class="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
+                        <button onclick="addTask('partner')" class="bg-indigo-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-indigo-700 transition duration-150">
+                            Adicionar
+                        </button>
+                    </div>
+
+                    <!-- Task List (for partner) -->
+                    <div id="partner-task-list" class="space-y-3">
+                        <p class="text-center text-gray-500">Nenhuma tarefa para esta semana.</p>
+                    </div>
+                </div>
+
+                <!-- 3. Rendimento Semanal (Stats Tab) -->
+                <div id="content-stats" class="tab-pane hidden">
+                    <h2 class="text-2xl font-bold mb-6 text-gray-800">Resumo Semanal e Incentivo</h2>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                        <!-- User A Stats -->
+                        <div class="p-6 bg-blue-50 rounded-lg shadow-md border border-blue-200">
+                            <h3 class="text-xl font-bold text-blue-700 mb-3">Sua Performance</h3>
+                            <div class="flex justify-between text-gray-700">
+                                <span>Concluídas: <span id="user-completed-count" class="font-bold text-blue-900">0</span></span>
+                                <span>Pendentes: <span id="user-pending-count" class="font-bold text-blue-900">0</span></span>
+                            </div>
+                            <div class="mt-3 text-2xl font-extrabold text-blue-600">
+                                Percentual: <span id="user-percentage">0%</span>
+                            </div>
+                        </div>
+
+                        <!-- User B Stats -->
+                        <div class="p-6 bg-pink-50 rounded-lg shadow-md border border-pink-200">
+                            <h3 class="text-xl font-bold text-pink-700 mb-3">Performance da Esposa</h3>
+                            <div class="flex justify-between text-gray-700">
+                                <span>Concluídas: <span id="partner-completed-count" class="font-bold text-pink-900">0</span></span>
+                                <span>Pendentes: <span id="partner-pending-count" class="font-bold text-pink-900">0</span></span>
+                            </div>
+                            <div class="mt-3 text-2xl font-extrabold text-pink-600">
+                                Percentual: <span id="partner-percentage">0%</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Weekly Award/Incentive -->
+                    <div id="award-section" class="award-card p-6 rounded-lg text-center">
+                        <h3 class="text-3xl font-extrabold text-gray-900 mb-2">🏆 Vencedor da Semana 🏆</h3>
+                        <p id="winner-message" class="text-xl font-semibold text-gray-800">Carregando resultado...</p>
+                        <p class="mt-4 text-sm text-gray-600">O incentivo será dado ao membro do casal com o maior percentual de conclusão!</p>
+                    </div>
+
+                    <p id="week-display" class="mt-6 text-center text-sm text-gray-500">Semana: <span id="current-week-dates"></span></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Custom Modal for Alerts/Confirmations -->
+        <div id="custom-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 hidden items-center justify-center p-4 z-50">
+            <div class="bg-white p-6 rounded-lg shadow-2xl max-w-sm w-full">
+                <h3 id="modal-title" class="text-xl font-bold mb-3 text-gray-800">Atenção</h3>
+                <p id="modal-message" class="text-gray-600 mb-4"></p>
+                <div class="flex justify-end space-x-3">
+                    <button id="modal-cancel" class="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 hidden">Cancelar</button>
+                    <button id="modal-confirm" class="px-4 py-2 text-white bg-indigo-600 rounded-md hover:bg-indigo-700">OK</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Application Logic (using localStorage) -->
+    <script>
+        // --- Globals and Constants ---
+        const LOCAL_STORAGE_KEY = 'weeklyRoutineApp_v1';
+        const PARTNER_TASK_ID = 'partner_tasks'; // Unique ID for wife's tasks, managed by the authenticated user
+        
+        let currentUserId = null; // Will store a unique ID generated for this user/browser
+
+        // UI Elements
+        const loadingScreen = document.getElementById('loading-screen');
+        const mainContent = document.getElementById('main-content');
+        const userTaskList = document.getElementById('user-task-list');
+        const partnerTaskList = document.getElementById('partner-task-list');
+        const motivationalMessageEl = document.getElementById('motivational-message');
+        
+        // Stats Elements
+        const userCompletedCountEl = document.getElementById('user-completed-count');
+        const userPendingCountEl = document.getElementById('user-pending-count');
+        const userPercentageEl = document.getElementById('user-percentage');
+        const partnerCompletedCountEl = document.getElementById('partner-completed-count');
+        const partnerPendingCountEl = document.getElementById('partner-pending-count');
+        const partnerPercentageEl = document.getElementById('partner-percentage');
+        const winnerMessageEl = document.getElementById('winner-message');
+        const currentWeekDatesEl = document.getElementById('current-week-dates');
+
+        // --- Local Storage Data Management ---
+
+        /** Gets the full application state from localStorage. */
+        function getAppState() {
+            try {
+                const json = localStorage.getItem(LOCAL_STORAGE_KEY);
+                return json ? JSON.parse(json) : { tasks: [], dailyMessage: { message: 'Carregando mensagem...', date: null } };
+            } catch (e) {
+                console.error("Erro ao carregar dados do localStorage:", e);
+                return { tasks: [], dailyMessage: { message: 'Erro ao carregar mensagem.', date: null } };
+            }
+        }
+
+        /** Saves the full application state to localStorage. */
+        function saveAppState(state) {
+            try {
+                localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(state));
+            } catch (e) {
+                console.error("Erro ao salvar dados no localStorage:", e);
+                customModal({ message: "Atenção: Não foi possível salvar os dados localmente. O navegador pode estar com o espaço de armazenamento cheio ou em modo privado." });
+            }
+        }
+
+        /** Loads data from storage, updates UI state, and calls render functions. */
+        function loadAndRenderData() {
+            const state = getAppState();
+            
+            // 1. Render Tasks and Stats
+            const allTasks = state.tasks;
+            const weekStartDate = getWeekStartDate();
+            currentWeekDatesEl.textContent = weekStartDate;
+            
+            // Filter tasks for the current week only
+            const currentWeekTasks = allTasks.filter(t => t.weekStart === weekStartDate);
+
+            // Split tasks for rendering
+            const userTasks = currentWeekTasks.filter(t => t.userId === currentUserId);
+            const partnerTasks = currentWeekTasks.filter(t => t.userId === PARTNER_TASK_ID);
+
+            renderTasks('user', userTasks);
+            renderTasks('partner', partnerTasks);
+            calculateAndDisplayStats(allTasks);
+
+            // 2. Render Motivational Message
+            motivationalMessageEl.textContent = state.dailyMessage.message;
+            checkAndUpdateDailyMessage(); // Check if update is needed
+        }
+
+        // --- Utility Functions ---
+
+        /** Generates a simple UUID (since we don't have Firebase UIDs). */
+        function generateUUID() {
+            return crypto.randomUUID();
+        }
+
+        /** Calculates the start date of the current week (Sunday). */
+        function getWeekStartDate() {
+            const now = new Date();
+            const dayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+            const diff = now.getDate() - dayOfWeek;
+            const weekStart = new Date(now.setDate(diff));
+            weekStart.setHours(0, 0, 0, 0);
+            return weekStart.toISOString().split('T')[0]; // Format YYYY-MM-DD
+        }
+        window.getWeekStartDate = getWeekStartDate;
+
+        /** Custom Modal for alerts/confirmations (replaces alert/confirm). */
+        function customModal({ message, title = "Atenção", onConfirm, onCancel, showCancel = false }) {
+            const modal = document.getElementById('custom-modal');
+            const modalTitle = document.getElementById('modal-title');
+            const modalMessage = document.getElementById('modal-message');
+            const modalConfirm = document.getElementById('modal-confirm');
+            const modalCancel = document.getElementById('modal-cancel');
+
+            modalTitle.textContent = title;
+            modalMessage.textContent = message;
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+
+            modalCancel.classList.toggle('hidden', !showCancel);
+
+            // Clone to remove previous listeners
+            const newConfirm = modalConfirm.cloneNode(true);
+            modalConfirm.parentNode.replaceChild(newConfirm, modalConfirm);
+            const newCancel = modalCancel.cloneNode(true);
+            modalCancel.parentNode.replaceChild(newCancel, modalCancel);
+
+            const closeModal = () => {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            };
+
+            newConfirm.onclick = () => {
+                closeModal();
+                if (onConfirm) onConfirm();
+            };
+
+            newCancel.onclick = () => {
+                closeModal();
+                if (onCancel) onCancel();
+            };
+        }
+        window.customModal = customModal;
+
+        /** Generates a simple SVG checkmark. */
+        function getCheckmarkSvg(color = "white") {
+            return `
+                <svg class="w-3 h-3" fill="none" stroke="${color}" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path>
+                </svg>
+            `;
+        }
+
+        // --- Task Rendering and CRUD (Local Storage) ---
+
+        /**
+         * Renders the list of tasks for a given user type ('user' or 'partner').
+         * @param {string} userType - 'user' or 'partner'.
+         * @param {Array<Object>} tasks - List of task objects.
+         */
+        function renderTasks(userType, tasks) {
+            const listEl = userType === 'user' ? userTaskList : partnerTaskList;
+            listEl.innerHTML = '';
+
+            if (tasks.length === 0) {
+                listEl.innerHTML = `<p class="text-center text-gray-500 py-4">Nenhuma tarefa. Adicione uma para começar!</p>`;
+                return;
+            }
+
+            // Sort: Incomplete tasks first, then by creation date
+            tasks.sort((a, b) => {
+                if (a.isCompleted !== b.isCompleted) {
+                    return a.isCompleted ? 1 : -1;
+                }
+                // Sort by creation date (using ISO strings)
+                return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+            });
+
+            tasks.forEach(task => {
+                const li = document.createElement('div');
+                li.className = `task-item ${task.isCompleted ? 'task-completed' : ''}`;
+                li.id = `task-${task.id}`;
+
+                const taskText = document.createElement('span');
+                taskText.className = 'flex-1 text-gray-800 break-words pr-4';
+                taskText.textContent = task.text;
+
+                const controls = document.createElement('div');
+                controls.className = 'flex items-center space-x-3';
+
+                // Checkbox/Check-in
+                const checkButton = document.createElement('div');
+                checkButton.className = 'icon-check';
+                checkButton.innerHTML = task.isCompleted ? getCheckmarkSvg() : '';
+                checkButton.onclick = () => toggleTaskCompletion(userType, task.id, !task.isCompleted);
+
+                // Delete Button
+                const deleteButton = document.createElement('button');
+                deleteButton.className = 'delete-btn text-xs';
+                deleteButton.textContent = 'Remover';
+                deleteButton.onclick = () => confirmDeleteTask(userType, task.id, task.text);
+
+                controls.appendChild(checkButton);
+                controls.appendChild(deleteButton);
+                li.appendChild(taskText);
+                li.appendChild(controls);
+
+                listEl.appendChild(li);
+            });
+        }
+
+        /**
+         * Adds a new task to local storage.
+         * @param {string} userType - 'user' or 'partner'.
+         */
+        function addTask(userType) {
+            const inputEl = userType === 'user' ? document.getElementById('user-task-input') : document.getElementById('partner-task-input');
+            const taskText = inputEl.value.trim();
+
+            if (taskText === '') {
+                customModal({ message: "Por favor, digite a tarefa antes de adicionar." });
+                return;
+            }
+
+            const state = getAppState();
+            const targetUserId = userType === 'user' ? currentUserId : PARTNER_TASK_ID;
+            
+            const newTask = {
+                id: generateUUID(),
+                userId: targetUserId,
+                text: taskText,
+                isCompleted: false,
+                createdAt: new Date().toISOString(), // Use ISO string instead of Timestamp
+                weekStart: getWeekStartDate()
+            };
+
+            state.tasks.push(newTask);
+            saveAppState(state);
+            inputEl.value = ''; // Clear input on success
+            
+            loadAndRenderData(); // Re-render the UI
+        }
+        window.addTask = addTask;
+
+        /**
+         * Toggles the completion status of a task.
+         */
+        function toggleTaskCompletion(userType, taskId, isCompleted) {
+            const state = getAppState();
+            const taskIndex = state.tasks.findIndex(t => t.id === taskId);
+
+            if (taskIndex !== -1) {
+                // Ensure correct user is modifying the task (optional for local, good practice)
+                const targetUserId = userType === 'user' ? currentUserId : PARTNER_TASK_ID;
+                if (state.tasks[taskIndex].userId === targetUserId) {
+                    state.tasks[taskIndex].isCompleted = isCompleted;
+                    state.tasks[taskIndex].completedAt = isCompleted ? new Date().toISOString() : null;
+                    
+                    saveAppState(state);
+                    loadAndRenderData(); // Re-render the UI
+                }
+            }
+        }
+
+        /**
+         * Confirms and deletes a task.
+         */
+        function confirmDeleteTask(userType, taskId, taskText) {
+            customModal({
+                title: "Confirmar Remoção",
+                message: `Tem certeza de que deseja remover a tarefa: "${taskText}"?`,
+                showCancel: true,
+                onConfirm: () => deleteTask(userType, taskId)
+            });
+        }
+
+        function deleteTask(userType, taskId) {
+            let state = getAppState();
+            
+            // Check ownership before deleting
+            const targetUserId = userType === 'user' ? currentUserId : PARTNER_TASK_ID;
+            
+            state.tasks = state.tasks.filter(t => !(t.id === taskId && t.userId === targetUserId));
+            
+            saveAppState(state);
+            loadAndRenderData(); // Re-render the UI
+        }
+
+        // --- Motivational Message Logic (Local Storage) ---
+
+        const motivationMessages = [
+            "Você é incrível e capaz de realizar tudo que se propõe! 🌟",
+            "O seu esforço de hoje vale a pena amanhã. Continue assim! ❤️",
+            "Lembre-se de respirar e se orgulhar de cada pequena vitória. Te amo!",
+            "Sua dedicação é uma inspiração para mim. Vá em frente!",
+            "Um elogio: O seu sorriso ilumina meu dia. Você é a melhor!",
+            "Não se esqueça de que você tem meu total apoio. Você é forte!",
+            "Elogio: Admiro a sua capacidade de gerenciar tantas coisas. Você é demais!",
+            "Mensagem especial: Meu amor, você está arrasando nesta semana!",
+            "Hoje é um ótimo dia para brilhar. E você já está brilhando!",
+            "Elogio: Sua gentileza e paciência me fazem te amar ainda mais. 😉"
+        ];
+
+        /**
+         * Checks if the message needs updating and updates it if the date is new, saving to localStorage.
+         */
+        function checkAndUpdateDailyMessage() {
+            const todayDate = new Date().toISOString().split('T')[0];
+            const state = getAppState();
+            
+            let currentMessageDate = state.dailyMessage.date;
+
+            // Update only if the date has changed
+            if (currentMessageDate !== todayDate) {
+                const randomIndex = Math.floor(Math.random() * motivationMessages.length);
+                const newMessage = motivationMessages[randomIndex];
+                
+                state.dailyMessage = { message: newMessage, date: todayDate };
+                saveAppState(state);
+                console.debug("Mensagem diária atualizada no localStorage.");
+                motivationalMessageEl.textContent = newMessage; // Update UI immediately
+            } else {
+                 console.debug("Mensagem diária já está atualizada no localStorage.");
+                 // Ensure the UI is updated from the loaded state if the function was called outside of loadAndRenderData
+                 motivationalMessageEl.textContent = state.dailyMessage.message;
+            }
+        }
+
+        // --- Performance/Stats Logic ---
+
+        /**
+         * Calculates performance metrics and determines the weekly winner.
+         * @param {Array<Object>} allTasks - All tasks for both users in the current week.
+         */
+        function calculateAndDisplayStats(allTasks) {
+            const weekStartDate = getWeekStartDate();
+            currentWeekDatesEl.textContent = weekStartDate; // Simplification: showing start date
+
+            // Filter tasks for the current week only
+            const currentWeekTasks = allTasks.filter(t => t.weekStart === weekStartDate);
+
+            const userTasks = currentWeekTasks.filter(t => t.userId === currentUserId);
+            const partnerTasks = currentWeekTasks.filter(t => t.userId === PARTNER_TASK_ID);
+
+            // Calculate stats for User A
+            const userTotal = userTasks.length;
+            const userCompleted = userTasks.filter(t => t.isCompleted).length;
+            const userPending = userTotal - userCompleted;
+            const userPercentage = userTotal > 0 ? Math.round((userCompleted / userTotal) * 100) : 0;
+
+            userCompletedCountEl.textContent = userCompleted;
+            userPendingCountEl.textContent = userPending;
+            userPercentageEl.textContent = `${userPercentage}%`;
+
+            // Calculate stats for Partner
+            const partnerTotal = partnerTasks.length;
+            const partnerCompleted = partnerTasks.filter(t => t.isCompleted).length;
+            const partnerPending = partnerTotal - partnerCompleted;
+            const partnerPercentage = partnerTotal > 0 ? Math.round((partnerCompleted / partnerTotal) * 100) : 0;
+
+            partnerCompletedCountEl.textContent = partnerCompleted;
+            partnerPendingCountEl.textContent = partnerPending;
+            partnerPercentageEl.textContent = `${partnerPercentage}%`;
+
+            // Determine Winner (Incentive)
+            let winnerMessage = '';
+            if (userTotal === 0 && partnerTotal === 0) {
+                winnerMessage = 'Nenhuma tarefa adicionada esta semana. Vamos começar!';
+            } else if (userPercentage > partnerPercentage) {
+                winnerMessage = '🎉 O Vencedor é VOCÊ! 🎉 Maior percentual de tarefas concluídas.';
+            } else if (partnerPercentage > userPercentage) {
+                winnerMessage = '🎉 A Vencedora é a ESPOSA! 🎉 Maior percentual de tarefas concluídas.';
+            } else if (userPercentage > 0) {
+                winnerMessage = '🤝 Empate! Ambos completaram suas tarefas com o mesmo percentual. Parabéns aos dois!';
+            } else {
+                 winnerMessage = 'Ainda não há tarefas concluídas esta semana. O primeiro passo é o mais importante!';
+            }
+            winnerMessageEl.textContent = winnerMessage;
+        }
+
+        // --- App Initialization ---
+
+        /** Handles setup, user ID generation, and starts the whole application flow. */
+        function initializeApp() {
+            // 1. Check for a stored user ID, otherwise create one (unique for this browser)
+            let storedUserId = localStorage.getItem('localUserId');
+            if (!storedUserId) {
+                storedUserId = generateUUID();
+                localStorage.setItem('localUserId', storedUserId);
+            }
+            currentUserId = storedUserId;
+            document.getElementById('current-user-id').textContent = currentUserId.substring(0, 8); // Show only part of the ID
+
+            // 2. Load and render all data from localStorage
+            loadAndRenderData();
+            
+            // 3. Show main content
+            loadingScreen.classList.add('hidden');
+            mainContent.classList.remove('hidden');
+
+            console.log(`Aplicativo inicializado com ID local: ${currentUserId}`);
+        }
+
+        // --- UI Logic ---
+
+        /** Tab switching functionality. */
+        function switchTab(tabId) {
+            // Hide all content panes
+            document.querySelectorAll('.tab-pane').forEach(el => el.classList.add('hidden'));
+            // Deactivate all buttons
+            document.querySelectorAll('.tab-button').forEach(el => el.classList.remove('active'));
+
+            // Show the selected content pane
+            document.getElementById(`content-${tabId}`).classList.remove('hidden');
+            // Activate the selected button
+            document.getElementById(`tab-${tabId}`).classList.add('active');
+        }
+        window.switchTab = switchTab;
+
+        // Start initialization on window load
+        window.onload = initializeApp;
+    </script>
+</body>
+</html>
